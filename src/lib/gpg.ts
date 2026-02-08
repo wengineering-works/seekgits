@@ -92,7 +92,21 @@ export async function encryptMultiRecipient(
   const result = await execGPG(args, content);
 
   if (!result.success || !result.output) {
-    throw new Error(`GPG encryption failed: ${result.error || 'Unknown error'}`);
+    const error = result.error || 'Unknown error';
+
+    // Check if error is due to missing public key
+    if (error.includes('No public key') || error.includes('not found') || error.includes('unusable public key')) {
+      throw new Error(
+        `GPG encryption failed: Missing public key.\n\n` +
+        `You need to import the public keys for all recipients:\n` +
+        `  ${sortedRecipients.join(', ')}\n\n` +
+        `Get the public key from your teammate and run:\n` +
+        `  gpg --import teammate-key.asc\n\n` +
+        `Original error: ${error}`
+      );
+    }
+
+    throw new Error(`GPG encryption failed: ${error}`);
   }
 
   return result.output;

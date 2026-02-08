@@ -217,12 +217,16 @@ git commit -m "Add encrypted .env"
 git push
 ```
 
-**Team member 2 (Bob) clones:**
+**Team member 2 (Bob) joins:**
 
 ```bash
 # Clone repository
 git clone <repo-url>
 cd <repo>
+
+# Export Bob's public key and send to Alice
+gpg --armor --export bob@example.com > bob-public-key.asc
+# Send bob-public-key.asc to Alice via email/Slack
 
 # Add Bob's key to secrets.json
 seekgits allow .env bob@example.com
@@ -233,9 +237,12 @@ git commit -m "Add Bob's key to .env"
 git push
 ```
 
-**Alice re-encrypts for Bob:**
+**Alice imports Bob's key and re-encrypts:**
 
 ```bash
+# Import Bob's public key
+gpg --import bob-public-key.asc
+
 # Pull Bob's key addition
 git pull
 
@@ -249,9 +256,12 @@ git commit -m "Re-encrypt .env for Bob"
 git push
 ```
 
-**Bob can now decrypt:**
+**Bob imports Alice's key and can now work:**
 
 ```bash
+# Get Alice's public key and import it
+gpg --import alice-public-key.asc
+
 # Pull re-encrypted file
 git pull
 
@@ -263,7 +273,15 @@ git checkout .
 
 # .env is now decrypted and readable
 cat .env
+
+# Bob can now edit and commit (requires Alice's public key to re-encrypt)
+echo "NEW_VAR=value" >> .env
+git add .env
+git commit -m "Add new variable"  # Encrypts for both Alice and Bob
+git push
 ```
+
+**Important**: Everyone must have everyone else's public keys imported to commit changes to shared files. When you commit, the file is encrypted for ALL keys in `allowed_keys`, so you need all those public keys in your keyring.
 
 ## Security Considerations
 
@@ -272,6 +290,29 @@ cat .env
 - **Private keys** are never shared or committed
 - **Public keys** are identified by email, key ID, or fingerprint
 - SeekGits uses your system's GPG keyring for all operations
+
+### Team Collaboration Requirement
+
+**Critical**: To commit changes to a shared secret file, you must have ALL teammates' public keys imported.
+
+When you commit, SeekGits encrypts the file for every key in `allowed_keys`. If you're missing any public key, the commit will fail.
+
+**Example**: If `.env` has `allowed_keys: ["alice@example.com", "bob@example.com", "charlie@example.com"]`, then:
+- Alice needs Bob's and Charlie's public keys to commit
+- Bob needs Alice's and Charlie's public keys to commit
+- Charlie needs Alice's and Bob's public keys to commit
+
+**Setup**: When onboarding a new team member, everyone should exchange and import public keys:
+
+```bash
+# Export your public key
+gpg --armor --export your-email@example.com > your-name.asc
+
+# Import teammates' public keys
+gpg --import alice.asc
+gpg --import bob.asc
+gpg --import charlie.asc
+```
 
 ### Access Control
 
