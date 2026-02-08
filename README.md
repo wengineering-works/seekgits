@@ -96,11 +96,11 @@ Files are encrypted using GPG's native multi-recipient encryption:
 ```json
 {
   "encrypted": "-----BEGIN PGP MESSAGE-----\n...",
-  "recipients": ["alice@example.com", "bob@example.com"]
+  "allowed_keys": ["alice@example.com", "bob@example.com"]
 }
 ```
 
-The `encrypted` field contains a single GPG message encrypted for all recipients. Any recipient can decrypt it with their private key.
+The `encrypted` field contains a single GPG message encrypted for all allowed keys. Any key holder can decrypt it with their private key.
 
 ### Git Filter Workflow
 
@@ -146,7 +146,7 @@ If the file is not yet tracked, it's automatically added to `.gitattributes`.
 
 ### `seekgits list`
 
-List all tracked files and their allowed recipients.
+List all tracked files and their allowed keys.
 
 ```bash
 seekgits list
@@ -307,10 +307,10 @@ gpg --gen-key
 
 This can happen if:
 - You don't have the private key needed to decrypt
-- Your key is not in the recipients list
+- Your key is not in the allowed_keys list
 - The file is corrupted
 
-Check the recipients list:
+Check the allowed keys:
 
 ```bash
 seekgits list
