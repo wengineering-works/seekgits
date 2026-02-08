@@ -1,0 +1,29 @@
+{
+  "name": "seekgits",
+  "version": "0.1.0",
+  "description": "Safely commit secret files to git using GPG encryption",
+  "type": "module",
+  "bin": {
+    "seekgits": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "test": "bun test",
+    "build": "bun build src/index.ts --outdir ./dist --target bun",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "latest"
+  },
+  "keywords": [
+    "git",
+    "gpg",
+    "encryption",
+    "secrets",
+    "cli"
+  ],
+  "author": "",
+  "license": "MIT"
+}
