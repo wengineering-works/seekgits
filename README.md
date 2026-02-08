@@ -26,14 +26,19 @@ gpg --gen-key
 
 ## Installation
 
+### Development
+
 ```bash
-# Using Bun (recommended for development)
+# Clone and install dependencies
 git clone https://github.com/yourusername/seekgits
 cd seekgits
 bun install
 
-# Add to PATH or use directly
-alias seekgits="bun run /path/to/seekgits/src/index.ts"
+# Link globally so you can use 'seekgits' command
+bun link
+
+# Verify installation
+seekgits version
 ```
 
 ## Quick Start

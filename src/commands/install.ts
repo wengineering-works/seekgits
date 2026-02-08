@@ -42,17 +42,12 @@ export async function installCommand(): Promise<void> {
       console.warn('Run "seekgits init" or add files with "seekgits allow" first');
     }
 
-    // Get the path to the seekgits binary
-    // In development, this will be "bun run src/index.ts"
-    // In production, this will be "seekgits"
-    const seekgitsCmd = process.argv[1].endsWith('.ts') ? 'bun run src/index.ts' : 'seekgits';
-
     console.log('Configuring git filters...\n');
 
     // Configure clean filter
     const cleanResult = await gitConfig([
       'filter.seekgits.clean',
-      `${seekgitsCmd} filter-clean %f`,
+      'seekgits filter-clean %f',
     ]);
 
     if (!cleanResult.success) {
@@ -64,7 +59,7 @@ export async function installCommand(): Promise<void> {
     // Configure smudge filter
     const smudgeResult = await gitConfig([
       'filter.seekgits.smudge',
-      `${seekgitsCmd} filter-smudge %f`,
+      'seekgits filter-smudge %f',
     ]);
 
     if (!smudgeResult.success) {
@@ -74,7 +69,7 @@ export async function installCommand(): Promise<void> {
     console.log('✓ Configured smudge filter (decrypts on checkout)');
 
     // Configure diff textconv
-    const diffResult = await gitConfig(['diff.seekgits.textconv', `${seekgitsCmd} filter-smudge`]);
+    const diffResult = await gitConfig(['diff.seekgits.textconv', 'seekgits filter-smudge']);
 
     if (!diffResult.success) {
       console.error(`Error configuring diff textconv: ${diffResult.error}`);
