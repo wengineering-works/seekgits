@@ -91,8 +91,8 @@ export async function encryptMultiRecipient(
 
   const result = await execGPG(args, content);
 
-  if (!result.success) {
-    throw new Error(`GPG encryption failed: ${result.error}`);
+  if (!result.success || !result.output) {
+    throw new Error(`GPG encryption failed: ${result.error || 'Unknown error'}`);
   }
 
   return result.output;
@@ -106,8 +106,8 @@ export async function decrypt(encryptedContent: string): Promise<string> {
 
   const result = await execGPG(args, encryptedContent);
 
-  if (!result.success) {
-    throw new Error(`GPG decryption failed: ${result.error}`);
+  if (!result.success || !result.output) {
+    throw new Error(`GPG decryption failed: ${result.error || 'Unknown error'}`);
   }
 
   return result.output;
@@ -120,7 +120,7 @@ export async function listKeys(): Promise<GPGKey[]> {
   const args = ['--list-keys', '--with-colons'];
   const result = await execGPG(args);
 
-  if (!result.success) {
+  if (!result.success || !result.output) {
     return [];
   }
 
@@ -172,7 +172,7 @@ export async function getDefaultKeyId(): Promise<string | null> {
   const args = ['--list-secret-keys', '--with-colons'];
   const result = await execGPG(args);
 
-  if (!result.success) {
+  if (!result.success || !result.output) {
     return null;
   }
 

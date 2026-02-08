@@ -45,7 +45,7 @@ Add keys with:
     // Create encrypted file structure
     const encryptedFile: EncryptedFile = {
       encrypted,
-      recipients: keys,
+      allowed_keys: keys,
     };
 
     // Output JSON to stdout

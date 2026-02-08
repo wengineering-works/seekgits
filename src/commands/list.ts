@@ -17,7 +17,7 @@ export async function listCommand(): Promise<void> {
     for (const file of files) {
       const keys = config.files[file].allowed_keys;
       console.log(`${file}`);
-      console.log(`  Recipients (${keys.length}):`);
+      console.log(`  Allowed keys (${keys.length}):`);
 
       for (const key of keys) {
         console.log(`    - ${key}`);

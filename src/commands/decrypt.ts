@@ -75,7 +75,7 @@ This can happen if:
   - The file is not properly encrypted
   - The encrypted data is corrupted
 
-Check that your GPG key is in the recipients list.`);
+Check that your GPG key is in the allowed_keys list.`);
     } else {
       console.error(`Error: ${errorMsg}`);
     }

@@ -58,7 +58,7 @@ export async function filterCleanCommand(args: string[]): Promise<void> {
     // Create encrypted file structure
     const encryptedFile: EncryptedFile = {
       encrypted,
-      recipients: keys,
+      allowed_keys: keys,
     };
 
     // Output JSON

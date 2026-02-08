@@ -20,7 +20,7 @@ Usage: seekgits <command> [options]
 Commands:
   init                    Initialize seekgits in current directory
   allow <file> <key>      Add a GPG key to allowed list for a file
-  list                    List all tracked files and their recipients
+  list                    List all tracked files and their allowed keys
   encrypt <file>          Manually encrypt a file (for testing)
   decrypt [file]          Manually decrypt a file (for testing)
   install                 Setup git filters for automatic encryption

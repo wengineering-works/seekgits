@@ -19,7 +19,7 @@ export interface FileConfig {
  */
 export interface EncryptedFile {
   encrypted: string;
-  recipients: string[];
+  allowed_keys: string[];
 }
 
 /**
