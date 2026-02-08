@@ -1,5 +1,113 @@
 # Known Issues
 
+## Non-Deterministic Encryption Causes False "Modified" Status
+
+**Status:** Confirmed issue, no clean solution yet
+
+### Symptom
+After running `git reset --hard HEAD` or `git checkout <file>`, git status shows the file as modified even though `git diff` shows no changes.
+
+```bash
+git reset --hard HEAD
+git status
+# Shows: modified:   test.env
+
+git diff test.env
+# Shows: (no output - no actual changes)
+```
+
+### Root Cause
+GPG encryption is non-deterministic - encrypting the same plaintext twice produces different encrypted output due to:
+- Random padding
+- Random session keys
+- Timestamps in PGP format
+
+When git checks if a file has changed:
+1. Checks file stats (timestamp, size) first (fast check)
+2. If stats changed, runs clean filter on working directory
+3. Compares clean filter output to what's in git
+4. Encrypted outputs differ (even though plaintext is same)
+5. Git shows file as modified
+
+### Impact
+- Confusing UX - users think file changed when it didn't
+- `git status` always shows tracked files as modified after certain operations
+- Can't trust `git status` for encrypted files
+- Might accidentally commit "no-change" commits
+
+### Workarounds
+
+**Workaround 1: Ignore it**
+- If `git diff` shows no changes, ignore the `git status` warning
+- Only commit when you actually made changes
+
+**Workaround 2: Use git diff to check**
+```bash
+git diff test.env  # If empty, no real changes
+```
+
+**Workaround 3: Add and reset** (refreshes index)
+```bash
+git add test.env
+git reset test.env
+# Sometimes clears the false modification flag
+```
+
+### Possible Solutions
+
+**Solution 1: Deterministic encryption mode**
+- Add `--encrypt-to-self` and store encrypted with deterministic mode
+- Problem: GPG doesn't have a true deterministic mode
+- Would need custom encryption wrapper
+
+**Solution 2: Store hash of plaintext**
+- Store SHA256 hash of plaintext in encrypted JSON
+- Git could use this to detect real changes
+- Requires changes to filter logic
+
+**Solution 3: Use git's built-in .gitattributes options**
+```
+test.env filter=seekgits diff=seekgits -diff
+```
+- The `-diff` flag tells git "don't show diffs for this file"
+- Might reduce confusion but doesn't fix root issue
+
+**Solution 4: Custom git diff driver**
+- Implement custom diff driver that always decrypts before comparing
+- More complex but could provide better UX
+
+**Solution 5: Accept and document**
+- This is a known limitation of git filters with non-deterministic output
+- Document clearly in README
+- Provide `seekgits verify` command to check if real changes exist
+
+### Related Issues
+- This is separate from the "blank file" bug
+- This happens even when everything is working correctly
+- Related to how git optimizes file change detection
+
+### Testing
+Reproduce:
+```bash
+# Setup
+seekgits init
+echo "SECRET=test" > .env
+seekgits allow .env <key>
+seekgits install
+git add .env secrets.json .gitattributes
+git commit -m "test"
+
+# Trigger the issue
+git checkout .
+git status  # Shows .env as modified
+
+git diff .env  # Shows no changes (plaintext identical)
+git diff --no-textconv .env  # Shows encrypted versions differ
+```
+
+### Priority
+**Medium** - Annoying but not breaking. Users can work around it. Should be documented clearly.
+
 ## Git Index Caching Bug
 
 **Status:** Workaround exists, but root cause may not be fully resolved
