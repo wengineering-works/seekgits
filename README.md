@@ -1,13 +1,12 @@
 # SeekGits
 
-Safely commit secret files (like `.env`) to git using GPG encryption with transparent git filter integration.
+Commit secret files (like `.env`) to git, using GPG encryption. Uses Git's `.gitattributes` feature to keep files decrypted on disk, but encrypted on commit/push.
 
 ## Features
 
 - **GPG-based encryption** - Uses your existing GPG keys, no custom key management
 - **Multi-recipient support** - Encrypt files for multiple team members
-- **Transparent git integration** - Files are automatically encrypted on commit and decrypted on checkout
-- **Simple workflow** - Edit secret files normally, git handles encryption automatically
+- **Seamless integration** - Files are automatically encrypted on commit and decrypted on checkout using `.gitattributes`, so you can edit and diff files normally
 - **Zero runtime dependencies** - Uses system GPG, no crypto libraries needed
 
 ## Prerequisites
@@ -26,20 +25,7 @@ gpg --gen-key
 
 ## Installation
 
-### Development
-
-```bash
-# Clone and install dependencies
-git clone https://github.com/yourusername/seekgits
-cd seekgits
-bun install
-
-# Link globally so you can use 'seekgits' command
-bun link
-
-# Verify installation
-seekgits version
-```
+This project is in development and not available on a package manager yet.
 
 ## Quick Start
 
@@ -408,32 +394,3 @@ seekgits/
 ├── tests/                    # Test files
 └── package.json
 ```
-
-## Comparison to Alternatives
-
-### vs git-crypt
-
-- **SeekGits**: Multi-recipient support, GPG-based, explicit file tracking
-- **git-crypt**: Single symmetric key, transparent encryption, simpler setup
-
-### vs git-secret
-
-- **SeekGits**: Transparent git integration (filters), JSON encrypted format
-- **git-secret**: Manual reveal/hide workflow, standard GPG file format
-
-### vs BlackBox
-
-- **SeekGits**: Bun/TypeScript, minimal dependencies, modern CLI
-- **BlackBox**: Bash-based, mature, battle-tested
-
-## License
-
-MIT
-
-## Contributing
-
-Contributions welcome! Please open an issue or PR.
-
-## Credits
-
-Built with [Bun](https://bun.sh) and GPG.
