@@ -1,0 +1,5 @@
+# SeekGits - GPG encrypted secrets
+# Files listed below will be automatically encrypted when committed
+# and decrypted when checked out.
+
+test.env filter=seekgits diff=seekgits
