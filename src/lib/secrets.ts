@@ -67,8 +67,9 @@ export async function initSecrets(): Promise<void> {
 
 /**
  * Add a key to the allowed list for a file
+ * Returns true if key was newly added, false if already existed
  */
-export async function addAllowedKey(file: string, keyId: string): Promise<void> {
+export async function addAllowedKey(file: string, keyId: string): Promise<boolean> {
   const config = await loadSecrets();
 
   if (!config.files[file]) {
@@ -79,12 +80,13 @@ export async function addAllowedKey(file: string, keyId: string): Promise<void> 
 
   // Check if key already exists
   if (config.files[file].allowed_keys.includes(keyId)) {
-    throw new Error(`Key ${keyId} is already allowed for ${file}`);
+    return false; // Key already exists, no changes made
   }
 
   config.files[file].allowed_keys.push(keyId);
 
   await saveSecrets(config);
+  return true; // Key was newly added
 }
 
 /**

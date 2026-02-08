@@ -6,6 +6,8 @@ import { listCommand } from './commands/list';
 import { encryptCommand } from './commands/encrypt';
 import { decryptCommand } from './commands/decrypt';
 import { installCommand } from './commands/install';
+import { reindexCommand } from './commands/reindex';
+import { statusCommand } from './commands/status';
 import { filterCleanCommand } from './commands/filter-clean';
 import { filterSmudgeCommand } from './commands/filter-smudge';
 
@@ -21,9 +23,11 @@ Commands:
   init                    Initialize seekgits in current directory
   allow <file> <key>      Add a GPG key to allowed list for a file
   list                    List all tracked files and their allowed keys
+  status [file]           Show diagnostic information (helps debug issues)
   encrypt <file>          Manually encrypt a file (for testing)
   decrypt [file]          Manually decrypt a file (for testing)
   install                 Setup git filters for automatic encryption
+  reindex <file>          Force git to re-filter a file (fixes index issues)
   filter-clean <file>     Git clean filter (internal use)
   filter-smudge [file]    Git smudge filter (internal use)
   help                    Show this help message
@@ -72,6 +76,10 @@ async function main(): Promise<void> {
         await listCommand();
         break;
 
+      case 'status':
+        await statusCommand(commandArgs);
+        break;
+
       case 'encrypt':
         await encryptCommand(commandArgs);
         break;
@@ -82,6 +90,10 @@ async function main(): Promise<void> {
 
       case 'install':
         await installCommand();
+        break;
+
+      case 'reindex':
+        await reindexCommand(commandArgs);
         break;
 
       case 'filter-clean':

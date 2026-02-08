@@ -138,6 +138,29 @@ List all tracked files and their allowed keys.
 seekgits list
 ```
 
+### `seekgits status [file]`
+
+Show diagnostic information about seekgits configuration. Helps debug encryption issues.
+
+```bash
+# Check overall configuration
+seekgits status
+
+# Check specific file (shows if properly encrypted in git)
+seekgits status .env
+seekgits status webapp/.env
+```
+
+The status command checks:
+- GPG installation
+- Configuration files (secrets.json, .gitattributes)
+- Git filter configuration
+- File tracking status
+- **What's actually staged in git** (encrypted, plaintext, or blank)
+- Whether filters are working
+
+Use this when files appear blank or not encrypted in git.
+
 ### `seekgits install`
 
 Setup git filters for automatic encryption/decryption.
@@ -147,6 +170,23 @@ seekgits install
 ```
 
 Run this once per repository clone. It configures git to use seekgits filters for files marked in `.gitattributes`.
+
+### `seekgits reindex <file>`
+
+Force git to re-filter and re-encrypt a file. Fixes issues where files appear blank or corrupted in git.
+
+```bash
+seekgits reindex .env
+seekgits reindex config/secrets.yml
+```
+
+Use this when:
+- File appears blank when staged or committed
+- You staged the file before running `seekgits install`
+- Git cached the file before filters were configured
+- You want to ensure a file is properly encrypted
+
+After reindexing, run `git add <file>` to re-encrypt.
 
 ### `seekgits encrypt <file>`
 

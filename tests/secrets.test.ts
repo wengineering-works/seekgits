@@ -83,13 +83,13 @@ describe('Secrets Management', () => {
     expect(keys).toContain('alice@example.com');
   });
 
-  test('addAllowedKey throws if key already exists', async () => {
+  test('addAllowedKey returns false if key already exists', async () => {
     await initSecrets();
-    await addAllowedKey('.env', 'alice@example.com');
+    const firstAdd = await addAllowedKey('.env', 'alice@example.com');
+    expect(firstAdd).toBe(true); // First add returns true
 
-    expect(async () => {
-      await addAllowedKey('.env', 'alice@example.com');
-    }).toThrow();
+    const secondAdd = await addAllowedKey('.env', 'alice@example.com');
+    expect(secondAdd).toBe(false); // Second add returns false (already exists)
   });
 
   test('getKeysSorted returns sorted keys', async () => {

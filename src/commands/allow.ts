@@ -1,5 +1,5 @@
 import { addAllowedKey, isFileTracked } from '../lib/secrets';
-import { addFileToGitattributes } from '../lib/config';
+import { addFileToGitattributes, clearGitIndexEntry } from '../lib/config';
 import { verifyKeyExists } from '../lib/gpg';
 import { validateFilePath, normalizeFilePath } from '../lib/config';
 
@@ -36,20 +36,29 @@ Arguments:
     }
 
     // Check if this is a new file
-    const isNew = !(await isFileTracked(filename));
+    const isNewFile = !(await isFileTracked(filename));
 
-    // Add key to secrets.json
-    await addAllowedKey(filename, keyId);
-    console.log(`✓ Added key "${keyId}" to ${filename}`);
+    // Add key to secrets.json (returns true if newly added, false if already existed)
+    const keyAdded = await addAllowedKey(filename, keyId);
+
+    if (keyAdded) {
+      console.log(`✓ Added key "${keyId}" to ${filename}`);
+    } else {
+      console.log(`✓ Key "${keyId}" already allowed for ${filename} (re-indexing)`);
+    }
 
     // Add to .gitattributes if new file
-    if (isNew) {
+    if (isNewFile) {
       await addFileToGitattributes(filename);
       console.log(`✓ Added ${filename} to .gitattributes`);
     }
 
+    // Always clear git index entry to force re-filtering on next git add
+    // This prevents stale index entries from being used and fixes index issues
+    await clearGitIndexEntry(filename);
+
     // Show next steps
-    if (isNew) {
+    if (isNewFile) {
       console.log(`
 Next steps:
   1. Make sure the file exists: ${filename}
@@ -61,11 +70,16 @@ Next steps:
      git commit -m "Add encrypted ${filename}"
 
 The file will be automatically encrypted when committed.`);
-    } else {
+    } else if (keyAdded) {
       console.log(`
 File already tracked. To re-encrypt with the new key:
   git add ${filename}
   git commit -m "Update ${filename} with new key"`);
+    } else {
+      console.log(`
+Git index cleared. To re-encrypt:
+  git add ${filename}
+  git commit -m "Re-encrypt ${filename}"`);
     }
   } catch (error) {
     console.error(`Error: ${(error as Error).message}`);

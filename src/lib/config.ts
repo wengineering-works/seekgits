@@ -128,3 +128,27 @@ export function normalizeFilePath(filepath: string): string {
   }
   return filepath;
 }
+
+/**
+ * Clear git index entry for a file
+ * This forces git to re-run filters on the next `git add`
+ * Prevents stale index entries from causing blank commits
+ */
+export async function clearGitIndexEntry(filepath: string): Promise<void> {
+  const { spawn } = await import('child_process');
+
+  return new Promise((resolve) => {
+    const git = spawn('git', ['rm', '--cached', '--ignore-unmatch', filepath]);
+
+    git.on('close', () => {
+      // Always resolve, even if file wasn't in index
+      // --ignore-unmatch prevents errors if file not staged
+      resolve();
+    });
+
+    git.on('error', () => {
+      // Ignore errors - file might not be in index yet
+      resolve();
+    });
+  });
+}
