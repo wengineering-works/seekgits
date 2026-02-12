@@ -60,7 +60,7 @@ async function showFileStatus(file: string): Promise<void> {
   }
 
   console.log(`${file}:`);
-  console.log(`  Recipients: ${config.recipients.join(', ')}`);
+  console.log(`  Recipients: ${Object.keys(config.keys).join(', ')}`);
   console.log(`  File exists: ${fileExists ? 'Yes' : 'No'}`);
   console.log(`  Can decrypt: ${canDecrypt ? 'Yes' : 'No (you may not have access)'}`);
 }

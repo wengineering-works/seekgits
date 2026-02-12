@@ -106,7 +106,6 @@ export async function addTrackedFile(
   }
 
   config.files[file] = {
-    recipients: [recipient],
     keys: {
       [recipient]: encryptedFileKey,
     },
@@ -129,11 +128,10 @@ export async function addRecipient(
     throw new Error(`File "${file}" is not tracked. Use "seekgits encrypt" first.`);
   }
 
-  if (config.files[file].recipients.includes(recipient)) {
+  if (config.files[file].keys[recipient]) {
     throw new Error(`Recipient "${recipient}" already has access to "${file}".`);
   }
 
-  config.files[file].recipients.push(recipient);
   config.files[file].keys[recipient] = encryptedFileKey;
 
   await saveSecrets(config);
@@ -166,11 +164,11 @@ export async function getFileKey(file: string): Promise<Buffer> {
   }
 
   // Try to decrypt with any available key
+  const recipients = Object.keys(fileConfig.keys);
   const errors: string[] = [];
 
-  for (const recipient of fileConfig.recipients) {
+  for (const recipient of recipients) {
     const encryptedKey = fileConfig.keys[recipient];
-    if (!encryptedKey) continue;
 
     try {
       return await gpgDecrypt(encryptedKey);
@@ -181,7 +179,7 @@ export async function getFileKey(file: string): Promise<Buffer> {
 
   throw new Error(
     `Cannot decrypt file key for "${file}". ` +
-    `You may not have access.\n\nTried recipients: ${fileConfig.recipients.join(', ')}`
+    `You may not have access.\n\nTried recipients: ${recipients.join(', ')}`
   );
 }
 
@@ -196,5 +194,5 @@ export async function getRecipients(file: string): Promise<string[]> {
     throw new Error(`File "${file}" is not tracked.`);
   }
 
-  return fileConfig.recipients;
+  return Object.keys(fileConfig.keys);
 }

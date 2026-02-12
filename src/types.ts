@@ -10,7 +10,6 @@ export interface SecretsConfig {
  * Per-file configuration
  */
 export interface FileConfig {
-  recipients: string[];
   keys: Record<string, string>; // recipient -> GPG-encrypted file key
 }
 
