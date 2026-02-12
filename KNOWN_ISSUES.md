@@ -2,7 +2,7 @@
 
 ## Non-Deterministic Encryption Causes False "Modified" Status
 
-**Status:** Confirmed issue, no clean solution yet
+**Status:** Proposed solution below (hybrid symmetric/GPG encryption)
 
 ### Symptom
 After running `git reset --hard HEAD` or `git checkout <file>`, git status shows the file as modified even though `git diff` shows no changes.
@@ -53,33 +53,160 @@ git reset test.env
 # Sometimes clears the false modification flag
 ```
 
-### Possible Solutions
+### Proposed Solution: Hybrid Symmetric/GPG Encryption
 
-**Solution 1: Deterministic encryption mode**
-- Add `--encrypt-to-self` and store encrypted with deterministic mode
-- Problem: GPG doesn't have a true deterministic mode
-- Would need custom encryption wrapper
+Based on how [git-crypt](https://github.com/AGWA/git-crypt) achieves deterministic encryption.
 
-**Solution 2: Store hash of plaintext**
-- Store SHA256 hash of plaintext in encrypted JSON
-- Git could use this to detect real changes
-- Requires changes to filter logic
+#### How git-crypt Works
 
-**Solution 3: Use git's built-in .gitattributes options**
+git-crypt uses AES-256-CTR with a synthetic IV derived from HMAC-SHA1 of the plaintext:
+
 ```
-test.env filter=seekgits diff=seekgits -diff
+Keys (stored in .git-crypt/keys/default):
+- AES key: 32 bytes (randomly generated)
+- HMAC key: 32 bytes (randomly generated)
+
+Encryption:
+1. nonce = HMAC-SHA1(plaintext, hmac_key)
+2. ciphertext = AES-256-CTR(plaintext, aes_key, nonce)
+3. output = "\0GITCRYPT\0" + nonce + ciphertext
+
+File format:
+| Offset | Size | Content                      |
+|--------|------|------------------------------|
+| 0      | 10   | \0GITCRYPT\0 (magic header)  |
+| 10     | 20   | HMAC-SHA1 nonce              |
+| 30     | N    | AES-256-CTR ciphertext       |
 ```
-- The `-diff` flag tells git "don't show diffs for this file"
-- Might reduce confusion but doesn't fix root issue
 
-**Solution 4: Custom git diff driver**
-- Implement custom diff driver that always decrypts before comparing
-- More complex but could provide better UX
+**Why it's deterministic:** The nonce is derived from the plaintext itself via HMAC. Same plaintext → same HMAC → same nonce → same ciphertext.
 
-**Solution 5: Accept and document**
-- This is a known limitation of git filters with non-deterministic output
-- Document clearly in README
-- Provide `seekgits verify` command to check if real changes exist
+#### Why Two Keys? (AES + HMAC Explained)
+
+AES-CTR doesn't just take `key + content`. It requires a **nonce** (number used once):
+
+```
+ciphertext = AES-CTR(aes_key, nonce, plaintext)
+```
+
+**The problem with random nonces:**
+```
+nonce = random_bytes(12)
+ciphertext = AES-CTR(key, nonce, plaintext)
+```
+Random nonce means same plaintext → different ciphertext each time. Git sees the file as "modified" even when content hasn't changed.
+
+**The solution - derive nonce from content:**
+```
+nonce = HMAC-SHA256(hmac_key, plaintext)   // deterministic!
+ciphertext = AES-CTR(aes_key, nonce, plaintext)
+```
+Now same plaintext → same nonce → same ciphertext. Git is happy.
+
+**Why HMAC instead of a plain hash?**
+We could use `nonce = SHA256(plaintext)`, but then anyone could compute the nonce by hashing the plaintext. With HMAC, you need the secret `hmac_key` to compute it, adding a layer of security.
+
+**Why SHA256 over SHA1?**
+git-crypt uses HMAC-SHA1, which is still secure for HMAC purposes. However, SeekGits uses HMAC-SHA256 because:
+- SHA256 is the modern standard with no legacy concerns
+- Produces 32-byte output (vs 20 for SHA1), matching our key sizes
+- Consistent with AES-256 security level
+
+**Why separate keys for AES and HMAC?**
+Using the same key for both would be a cryptographic weakness. Separate keys ensure:
+- Domain separation: a flaw in one algorithm wouldn't compromise the other
+- Provable security: security proofs assume independent keys
+- Standard practice: this is how TLS, IPsec, and other protocols do it
+
+**Summary of the two keys:**
+| Key | Size | Purpose |
+|-----|------|---------|
+| `aes_key` | 32 bytes | Encrypts the content (AES-256-CTR) |
+| `hmac_key` | 32 bytes | Derives the nonce via HMAC-SHA256 (makes encryption deterministic) |
+
+Both are bundled together as one 64-byte "file key" and encrypted to each recipient via GPG.
+
+#### How SeekGits Would Differ from git-crypt
+
+| Feature | git-crypt | SeekGits (proposed) |
+|---------|-----------|---------------------|
+| **HMAC algorithm** | HMAC-SHA1 (20-byte nonce) | HMAC-SHA256 (32-byte nonce) |
+| **Key granularity** | One key for entire repo | Per-file keys |
+| **Access control** | All-or-nothing | Per-file recipient lists |
+| **Key storage** | `.git-crypt/keys/` (gitignored) | `secrets.json` (committed, encrypted) |
+| **Key distribution** | GPG-encrypted key file shared out-of-band | GPG-wrapped keys inline in secrets.json |
+| **Adding recipients** | Re-run `git-crypt add-gpg-user` | `seekgits allow <file> <key>` |
+| **Revoking access** | Not supported (must rotate all secrets) | Per-file: regenerate that file's key |
+| **File patterns** | `.gitattributes` patterns | Explicit file list in secrets.json |
+
+#### Proposed SeekGits Architecture
+
+**secrets.json format:**
+```json
+{
+  "files": {
+    ".env": {
+      "allowed_keys": ["alice@example.com", "bob@example.com"],
+      "file_key": {
+        "alice@example.com": "-----BEGIN PGP MESSAGE-----\n<aes+hmac key encrypted to alice>...",
+        "bob@example.com": "-----BEGIN PGP MESSAGE-----\n<aes+hmac key encrypted to bob>..."
+      }
+    }
+  }
+}
+```
+
+**Encryption flow (clean filter):**
+1. Look up file's symmetric key from `secrets.json`
+2. Decrypt symmetric key using user's GPG private key (once, can be cached in memory)
+3. Compute `nonce = HMAC-SHA256(hmac_key, plaintext)` (use first 16 bytes for AES-CTR IV)
+4. Encrypt `ciphertext = AES-256-CTR(aes_key, nonce[0:16], plaintext)`
+5. Output: `\0SEEKGITS\0` + nonce (32 bytes) + ciphertext
+
+**Encrypted file format:**
+```
+| Offset | Size | Content                       |
+|--------|------|-------------------------------|
+| 0      | 10   | \0SEEKGITS\0 (magic header)   |
+| 10     | 32   | HMAC-SHA256 nonce             |
+| 42     | N    | AES-256-CTR ciphertext        |
+```
+
+**Decryption flow (smudge filter):**
+1. Look up file's symmetric key from `secrets.json`
+2. Decrypt symmetric key using user's GPG private key
+3. Read nonce from file header
+4. Decrypt with AES-256-CTR
+
+**Key generation (on `seekgits allow`):**
+1. If file has no key yet: generate 64 random bytes (32 AES + 32 HMAC)
+2. Encrypt the symmetric key to the recipient using GPG
+3. Store encrypted key in `secrets.json`
+
+**Adding a new recipient:**
+1. Decrypt existing symmetric key (requires being an existing recipient)
+2. Re-encrypt symmetric key to new recipient using GPG
+3. Add to `secrets.json`
+
+#### Benefits Over Current GPG-Only Approach
+
+- **Deterministic:** Same plaintext always produces same ciphertext
+- **Efficient:** Symmetric crypto is fast; GPG only used for key exchange
+- **Git-friendly:** No false "modified" status on unchanged files
+
+#### Trade-offs
+
+- **Complexity:** More moving parts than pure GPG
+- **secrets.json size:** Contains encrypted key material (grows with recipients)
+- **Revocation:** Requires re-generating file key and re-encrypting the file
+- **Key recovery:** If all recipients lose access, file key is unrecoverable
+
+#### Implementation Notes
+
+- Use Node.js `crypto` module for AES-256-CTR and HMAC-SHA1
+- GPG still handles asymmetric encryption of the symmetric keys
+- File header `\0SEEKGITS\0` distinguishes from git-crypt and legacy GPG format
+- Consider migration path from current GPG-only encrypted files
 
 ### Related Issues
 - This is separate from the "blank file" bug

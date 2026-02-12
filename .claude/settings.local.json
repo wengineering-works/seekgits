@@ -3,7 +3,8 @@
     "allow": [
       "Bash(tree:*)",
       "Bash(bun test)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
