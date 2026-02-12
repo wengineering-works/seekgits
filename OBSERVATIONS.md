@@ -1,0 +1,1 @@
+- When decrypting, this program currently tries all the keys and tries to GPG decrypt all of them, there might be a more efficient way of doing this
