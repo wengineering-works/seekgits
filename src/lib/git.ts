@@ -81,3 +81,17 @@ export async function getGitContent(file: string): Promise<Buffer | null> {
   }
   return Buffer.from(result.output, 'binary');
 }
+
+/**
+ * Add a file to the git index
+ */
+export async function gitAdd(file: string): Promise<void> {
+  await execGit(['add', file]);
+}
+
+/**
+ * Add a file with --renormalize to force filter re-application
+ */
+export async function gitAddRenormalize(file: string): Promise<void> {
+  await execGit(['add', '--renormalize', file]);
+}
