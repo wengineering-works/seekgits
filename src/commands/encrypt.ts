@@ -1,7 +1,7 @@
 import { access } from 'fs/promises';
 import { secretsExists, isFileTracked, addTrackedFile } from '../lib/secrets';
 import { addFilter } from '../lib/gitattributes';
-import { gitAdd, gitAddRenormalize } from '../lib/git';
+import { gitAdd, clearGitIndexEntry } from '../lib/git';
 import { getDefaultKeyId, gpgEncrypt, getKeyEmail } from '../lib/gpg';
 import { generateFileKey } from '../lib/crypto';
 
@@ -60,8 +60,9 @@ export async function encryptCommand(file: string): Promise<void> {
   // Stage .gitattributes first so git knows about the filter
   await gitAdd('.gitattributes');
 
-  // Add file with --renormalize to force filter application
-  await gitAddRenormalize(file);
+  // Clear any cached index entry, then stage with filter
+  await clearGitIndexEntry(file);
+  await gitAdd(file);
   console.log(`Staged ${file} (encrypted)`);
 
   console.log('');
