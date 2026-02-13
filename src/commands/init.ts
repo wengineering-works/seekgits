@@ -20,29 +20,25 @@ export async function initCommand(): Promise<void> {
     process.exit(1);
   }
 
-  // Check if already initialized
-  if (await secretsExists()) {
-    console.log('SeekGits is already initialized in this repository.');
-    console.log('');
-    console.log('Next steps:');
-    console.log('  seekgits encrypt <file>    Start tracking a file');
-    console.log('  seekgits status            Show tracked files');
-    return;
-  }
+  const alreadyInitialized = await secretsExists();
 
-  // Initialize secrets.json
-  await initSecrets();
-  console.log('Created secrets.json');
-
-  // Configure git filters
+  // Configure git filters (always - each user needs local config)
   await configureFilters();
   console.log('Configured git filters');
+
+  // Initialize secrets.json only if it doesn't exist
+  if (!alreadyInitialized) {
+    await initSecrets();
+    console.log('Created secrets.json');
+  }
 
   console.log('');
   console.log('SeekGits initialized successfully!');
   console.log('');
   console.log('Next steps:');
   console.log('  seekgits encrypt <file>    Start tracking a file');
-  console.log('');
-  console.log('Remember to commit secrets.json and .gitattributes');
+  if (!alreadyInitialized) {
+    console.log('');
+    console.log('Remember to commit secrets.json and .gitattributes');
+  }
 }
