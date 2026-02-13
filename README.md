@@ -1,10 +1,10 @@
-# SeekGits - Implementation Plan (v2)
+# Seekgits
 
 A CLI tool for transparent, deterministic encryption of secrets in git repositories.
 
 ## Overview
 
-SeekGits encrypts sensitive files (like `.env`) so they can be committed to git. Unlike the original GPG-only approach, this version uses **hybrid encryption** for deterministic output - the same plaintext always produces the same ciphertext, which is essential for git's change detection.
+Seekgits encrypts sensitive files (like `.env`) so they can be committed to git. These files are stored in a `secrets.json` file at the root of each repo, and are encrypted with gpg keys so each file has unique user access.
 
 ### Key Features
 
@@ -15,7 +15,7 @@ SeekGits encrypts sensitive files (like `.env`) so they can be committed to git.
 
 ## Encryption Scheme
 
-Based on [git-crypt](https://github.com/AGWA/git-crypt)'s approach, but with per-file keys and HMAC-SHA256.
+Inspired by [git-crypt](https://github.com/AGWA/git-crypt)'s approach, but rewritten in Typescript and set up with per-file keys and HMAC-SHA256.
 
 ### Why Two Keys? (AES + HMAC)
 
@@ -62,14 +62,12 @@ Committed to repo. Contains file tracking info and GPG-encrypted file keys.
   "version": 1,
   "files": {
     ".env": {
-      "recipients": ["alice@example.com", "bob@example.com"],
       "keys": {
         "alice@example.com": "-----BEGIN PGP MESSAGE-----\n...\n-----END PGP MESSAGE-----",
         "bob@example.com": "-----BEGIN PGP MESSAGE-----\n...\n-----END PGP MESSAGE-----"
       }
     },
     "config/prod.env": {
-      "recipients": ["alice@example.com"],
       "keys": {
         "alice@example.com": "-----BEGIN PGP MESSAGE-----\n..."
       }
@@ -77,6 +75,8 @@ Committed to repo. Contains file tracking info and GPG-encrypted file keys.
   }
 }
 ```
+
+Recipients are derived from the keys in `keys` object.
 
 ### .gitattributes
 
@@ -116,11 +116,13 @@ Start tracking a file. Encrypts to your default GPG key.
 3. Encrypt file key to user's GPG key
 4. Add entry to `secrets.json`
 5. Add filter rule to `.gitattributes`
-6. Clear git index entry for file (prevents caching bugs)
+6. Stage `.gitattributes` and the file (with encryption filter applied)
 
 **Usage:**
 ```bash
 seekgits encrypt .env
+git add secrets.json
+git commit -m "Add encrypted secrets"
 ```
 
 ### `seekgits share <file> <gpg-key>`
@@ -198,120 +200,17 @@ seekgits status
 seekgits status .env
 ```
 
-## Implementation Phases
+## Verifying Encryption
 
-### Phase 1: Core Encryption
-
-**Goal:** Working encrypt/decrypt without git integration.
-
-**Files:**
-- `src/lib/crypto.ts` - AES-256-CTR + HMAC-SHA256 functions
-- `src/lib/gpg.ts` - GPG encrypt/decrypt for file keys
-- `src/lib/secrets.ts` - Load/save `secrets.json`
-
-**Functions to implement:**
-
-```typescript
-// crypto.ts
-function generateFileKey(): Buffer  // 64 random bytes
-function encrypt(plaintext: Buffer, fileKey: Buffer): Buffer
-function decrypt(ciphertext: Buffer, fileKey: Buffer): Buffer
-
-// gpg.ts
-function gpgEncrypt(data: Buffer, recipient: string): Promise<string>
-function gpgDecrypt(armored: string): Promise<Buffer>
-function listKeys(): Promise<GPGKey[]>
-function verifyKeyExists(keyId: string): Promise<boolean>
-
-// secrets.ts
-function loadSecrets(): Promise<SecretsConfig>
-function saveSecrets(config: SecretsConfig): Promise<void>
-function getFileKey(file: string): Promise<Buffer>  // decrypts using user's GPG
-function addRecipient(file: string, recipient: string, fileKey: Buffer): Promise<void>
-```
-
-**Tests:**
-- Encrypt then decrypt returns original plaintext
-- Same plaintext + same key = same ciphertext (determinism!)
-- Different plaintext = different ciphertext
-- File key GPG round-trip works
-
-### Phase 2: CLI Commands
-
-**Goal:** User-facing commands work.
-
-**Files:**
-- `src/cli.ts` - Main CLI entry point
-- `src/commands/init.ts`
-- `src/commands/encrypt.ts`
-- `src/commands/share.ts`
-- `src/commands/remove.ts`
-- `src/commands/status.ts`
-- `src/commands/filter.ts` - encrypt/decrypt subcommands
-
-**Manual testing:**
 ```bash
-# Initialize
-seekgits init
-cat secrets.json  # Should show version: 1, empty files
+# Check that git stores encrypted content
+git cat-file blob HEAD:.env | xxd | head
+# Should show \0SEEKGITS\0 header (00 53 45 45 4b 47 49 54 53 00)
 
-# Encrypt a file (uses default GPG key)
-echo "SECRET=test" > .env
-seekgits encrypt .env
-cat secrets.json  # Should show .env with encrypted key
-
-# Test encryption manually
-cat .env | seekgits filter encrypt .env | xxd | head
-# Should start with 00 53 45 45 4b 47 49 54 53 00 (\0SEEKGITS\0)
-
-# Test round-trip
-cat .env | seekgits filter encrypt .env | seekgits filter decrypt .env
-# Should output: SECRET=test
-```
-
-### Phase 3: Git Integration
-
-**Goal:** Transparent encryption via git filters.
-
-**Files:**
-- `src/commands/init.ts` - Enhanced with git config setup
-- `src/lib/gitattributes.ts` - Manage .gitattributes
-
-**Manual testing:**
-```bash
-# Setup
-git init test-repo && cd test-repo
-seekgits init
-echo "SECRET=test" > .env
-seekgits encrypt .env
-
-# Commit
-git add .env secrets.json .gitattributes
-git commit -m "Add encrypted env"
-
-# Verify encrypted in git
-git show HEAD:.env | xxd | head
-# Should show \0SEEKGITS\0 header
-
-# Verify decrypted in working dir
+# Working directory always shows plaintext
 cat .env
-# Should show: SECRET=test
-
-# Test determinism
-touch .env  # Change mtime
-git status
-# Should NOT show .env as modified (deterministic encryption!)
+# Shows: API_KEY=secret123
 ```
-
-### Phase 4: Polish
-
-**Goal:** Good UX and edge case handling.
-
-**Features:**
-- Helpful error messages for common issues
-- GPG key not found errors
-- Missing recipient errors
-- Clear git index on `encrypt` to prevent caching bugs
 
 ## Tech Stack
 
@@ -348,16 +247,6 @@ seekgits/
 ├── tsconfig.json
 └── README.md
 ```
-
-## Key Differences from v1 (GPG-only)
-
-| Aspect | v1 (GPG-only) | v2 (Hybrid) |
-|--------|---------------|-------------|
-| Encryption | GPG multi-recipient | AES-256-CTR + HMAC-SHA256 |
-| Determinism | No (random padding/session keys) | Yes (nonce from HMAC) |
-| Key storage | None (GPG handles it) | `secrets.json` (GPG-wrapped) |
-| Git status | False "modified" on unchanged files | Correct status |
-| Performance | Slower (asymmetric crypto) | Faster (symmetric + GPG once) |
 
 ## Security Considerations
 
