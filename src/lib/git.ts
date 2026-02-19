@@ -38,18 +38,32 @@ export async function isGitRepo(): Promise<boolean> {
 }
 
 /**
+ * Resolve the absolute command to invoke seekgits.
+ * GUI apps (e.g. Sourcetree) don't inherit the shell PATH,
+ * so we store absolute paths in git config to ensure the filter works.
+ */
+function resolveSeekgitsCommand(): string {
+  return `${process.execPath} ${Bun.main}`;
+}
+
+/**
  * Configure git filter for seekgits
  */
 export async function configureFilters(): Promise<void> {
+  const bin = resolveSeekgitsCommand();
+
   // Set up clean filter (encrypt on add)
-  await execGit(['config', 'filter.seekgits.clean', 'seekgits filter encrypt %f']);
+  await execGit(['config', 'filter.seekgits.clean', `${bin} filter encrypt %f`]);
 
   // Set up smudge filter (decrypt on checkout)
-  await execGit(['config', 'filter.seekgits.smudge', 'seekgits filter decrypt %f']);
+  await execGit(['config', 'filter.seekgits.smudge', `${bin} filter decrypt %f`]);
+
+  // Require the filter — fail loudly instead of silently passing plaintext
+  await execGit(['config', 'filter.seekgits.required', 'true']);
 
   // Set up diff driver (show decrypted diffs)
   // Note: textconv receives temp file as argument, we pass %f for context
-  await execGit(['config', 'diff.seekgits.textconv', 'seekgits filter decrypt %f']);
+  await execGit(['config', 'diff.seekgits.textconv', `${bin} filter decrypt %f`]);
 
   // Mark as binary to prevent line ending issues
   await execGit(['config', 'diff.seekgits.binary', 'true']);
