@@ -52,8 +52,8 @@ function parseLines(content: string): string[] {
  */
 export async function hasFilter(file: string): Promise<boolean> {
   const content = await loadGitattributes();
-  const pattern = `${file} filter=seekgits`;
-  return content.includes(pattern);
+  const lineSet = new Set(parseLines(content));
+  return lineSet.has(`${file} filter=seekgits diff=seekgits`);
 }
 
 /**
@@ -61,16 +61,15 @@ export async function hasFilter(file: string): Promise<boolean> {
  */
 export async function addFilter(file: string): Promise<void> {
   const content = await loadGitattributes();
+  const lines = parseLines(content);
+  const lineSet = new Set(lines);
 
-  // Check if already present
   const filterLine = `${file} filter=seekgits diff=seekgits`;
-  if (content.includes(filterLine)) {
+  if (lineSet.has(filterLine)) {
     return; // Already configured
   }
 
-  const lines = parseLines(content);
   lines.push(filterLine);
-
   await saveGitattributes(lines.join('\n') + '\n');
 }
 
